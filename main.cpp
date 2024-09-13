@@ -1,10 +1,9 @@
-#include <cstdio>
-
 #define STL_ALIASES
 #define STL_HELPERS
 #include "Types.h"
 
 #include <array>
+#include <iostream>
 #include <random>
 
 enum class Suit {
@@ -12,7 +11,6 @@ enum class Suit {
     Diamonds,
     Hearts,
     Spades,
-    Last = Spades,
 };
 
 const Map<Suit, str> SuitNames = {
@@ -159,6 +157,90 @@ public:
     }
 };
 
+Map<Rank, int> GetRankCount(const Vector<Card>& cards) {
+    std::map<Rank, int> rankCount;
+    for (const auto& card : cards) {
+        rankCount[card.rank]++;
+    }
+    return rankCount;
+}
+
+bool IsFlush(const Vector<Card>& cards) {
+    Map<Suit, int> suitCount;
+    for (const auto& card : cards) {
+        suitCount[card.suit]++;
+    }
+
+    return std::ranges::any_of(suitCount,
+                               [](std::pair<Suit, int> pair) { return pair.second >= 5; });
+}
+
+bool IsStraight(const Vector<Card>& cards) {
+    Vector<Rank> ranks;
+    for (const auto& card : cards) {
+        ranks.push_back(card.rank);
+    }
+
+    std::ranges::sort(ranks);
+
+    // Remove duplicates
+    const auto last = std::ranges::unique(ranks).begin();
+    ranks.erase(last, ranks.end());
+
+    // Check for a straight
+    int consecutiveCount = 1;
+    for (size_t i = 1; i < ranks.size(); ++i) {
+        if (static_cast<int>(ranks[i]) == static_cast<int>(ranks[i - 1]) + 1) {
+            consecutiveCount++;
+            if (consecutiveCount >= 5) {
+                return true;
+            }
+        } else if (static_cast<int>(ranks[i]) != static_cast<int>(ranks[i - 1])) {
+            consecutiveCount = 1;
+        }
+    }
+    return false;
+}
+
+HandRank EvaluateHand(const Vector<Card>& cards) {
+    auto rankCount      = GetRankCount(cards);
+    const bool flush    = IsFlush(cards);
+    const bool straight = IsStraight(cards);
+
+    if (flush && straight) {
+        // Check for straight flush
+        if (rankCount[Rank::Ace] && rankCount[Rank::King] && rankCount[Rank::Queen] &&
+            rankCount[Rank::Jack] && rankCount[Rank::Ten]) {
+            return HandRank::RoyalFlush;
+        }
+        return HandRank::StraightFlush;
+    }
+    if (rankCount.size() == 2) {
+        if (rankCount.begin()->second == 4 || rankCount.rbegin()->second == 4) {
+            return HandRank::FourOfAKind;
+        } else {
+            return HandRank::FullHouse;
+        }
+    }
+    if (rankCount.size() == 3) {
+        if (rankCount.begin()->second == 3 || rankCount.rbegin()->second == 3) {
+            return HandRank::ThreeOfAKind;
+        } else {
+            return HandRank::TwoPair;
+        }
+    }
+    if (rankCount.size() == 4) {
+        return HandRank::OnePair;
+    }
+    if (flush) {
+        return HandRank::Flush;
+    }
+    if (straight) {
+        return HandRank::Straight;
+    }
+    return HandRank::HighCard;
+}
+
 int main() {
     Deck deck;
     deck.Shuffle();
@@ -173,18 +255,54 @@ int main() {
     {
         auto community = deck.communityCards;
         auto hand      = playerHand.cards;
-        std::vector<Card> temp;
+        std::vector<Card> inPlay;
 
         // Insert elements from both arrays
-        temp.insert(temp.end(), community.begin(), community.end());
-        temp.insert(temp.end(), hand.begin(), hand.end());
+        inPlay.insert(inPlay.end(), community.begin(), community.end());
+        inPlay.insert(inPlay.end(), hand.begin(), hand.end());
 
         // Sort the combined vector
-        std::sort(temp.begin(), temp.end());
+        std::sort(inPlay.begin(), inPlay.end());
 
-        // Copy sorted elements to std::array
-        std::array<Card, 7> inPlay = {};
-        std::ranges::copy(temp, inPlay.begin());
+        const auto result = EvaluateHand(inPlay);
+
+        for (auto card : inPlay) {
+            std::cout << "| " << card.Name() << " ";
+        }
+        std::cout << std::endl;
+
+        switch (result) {
+            case HandRank::HighCard:
+                std::cout << "High Card\n";
+                break;
+            case HandRank::OnePair:
+                std::cout << "One Pair\n";
+                break;
+            case HandRank::TwoPair:
+                std::cout << "Two Pair\n";
+                break;
+            case HandRank::ThreeOfAKind:
+                std::cout << "Three of a Kind\n";
+                break;
+            case HandRank::Straight:
+                std::cout << "Straight\n";
+                break;
+            case HandRank::Flush:
+                std::cout << "Flush\n";
+                break;
+            case HandRank::FullHouse:
+                std::cout << "Full House\n";
+                break;
+            case HandRank::FourOfAKind:
+                std::cout << "Four of a Kind\n";
+                break;
+            case HandRank::StraightFlush:
+                std::cout << "Straight Flush\n";
+                break;
+            case HandRank::RoyalFlush:
+                std::cout << "Royal Flush\n";
+                break;
+        }
     }
 
     return 0;
