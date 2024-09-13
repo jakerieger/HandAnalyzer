@@ -91,7 +91,7 @@ public:
 
     Deck() : communityCards({}) {
         for (const Suit suit : {Suit::Clubs, Suit::Diamonds, Suit::Hearts, Suit::Spades}) {
-            for (i32 rank = 1; rank <= 13; ++rank) {
+            for (i32 rank = 2; rank <= 14; rank++) {
                 cards.push_back({suit, (Rank)rank});
             }
         }
